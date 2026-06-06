@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/maro114510/filler-cli/internal/pipeline"
 	"github.com/maro114510/filler-cli/internal/report"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 var (
@@ -157,16 +159,67 @@ func loadOrPromptKeyInternal(ks *keystore.Store, issuer oneTimeKeyIssuer) (strin
 
 func promptKey() (string, error) {
 	fmt.Fprint(os.Stderr, "Enter AmiVoice API key: ")
-	r := bufio.NewReader(os.Stdin)
-	line, err := r.ReadString('\n')
+	key, err := readMasked(os.Stderr, os.Stdin)
+	fmt.Fprintln(os.Stderr)
 	if err != nil {
 		return "", fmt.Errorf("failed to read API key: %w", err)
 	}
-	key := strings.TrimSpace(line)
 	if key == "" {
 		return "", errors.New("API key must not be empty")
 	}
 	return key, nil
+}
+
+// readMasked reads a line from in, printing '*' for each character to out.
+// When in is not a terminal (e.g. piped input), it falls back to plain line reading.
+func readMasked(out io.Writer, in *os.File) (string, error) {
+	fd := int(in.Fd()) //nolint:gosec // uintptr→int is safe for file descriptors on all supported platforms
+	if !term.IsTerminal(fd) {
+		r := bufio.NewReader(in)
+		line, err := r.ReadString('\n')
+		if err != nil && !errors.Is(err, io.EOF) {
+			return "", fmt.Errorf("read input: %w", err)
+		}
+		return strings.TrimRight(line, "\r\n"), nil
+	}
+
+	old, err := term.MakeRaw(fd)
+	if err != nil {
+		return "", fmt.Errorf("set raw mode: %w", err)
+	}
+	defer term.Restore(fd, old) //nolint:errcheck
+
+	var buf []byte
+	b := make([]byte, 1)
+	for {
+		if _, err := in.Read(b); err != nil {
+			if errors.Is(err, io.EOF) && len(buf) > 0 {
+				return string(buf), nil
+			}
+			return "", fmt.Errorf("read input: %w", err)
+		}
+		switch b[0] {
+		case '\r', '\n':
+			return string(buf), nil
+		case 3: // Ctrl+C
+			return "", errors.New("interrupted")
+		case 4: // Ctrl+D
+			if len(buf) == 0 {
+				return "", io.EOF
+			}
+			return string(buf), nil
+		case 127, '\b': // DEL / Backspace
+			if len(buf) > 0 {
+				buf = buf[:len(buf)-1]
+				_, _ = fmt.Fprint(out, "\b \b")
+			}
+		default:
+			if b[0] >= 32 {
+				buf = append(buf, b[0])
+				_, _ = fmt.Fprint(out, "*")
+			}
+		}
+	}
 }
 
 func init() {
