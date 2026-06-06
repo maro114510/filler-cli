@@ -173,12 +173,12 @@ func promptKey() (string, error) {
 // readMasked reads a line from in, printing '*' for each character to out.
 // When in is not a terminal (e.g. piped input), it falls back to plain line reading.
 func readMasked(out io.Writer, in *os.File) (string, error) {
-	fd := int(in.Fd())
+	fd := int(in.Fd()) //nolint:gosec // uintptr→int is safe for file descriptors on all supported platforms
 	if !term.IsTerminal(fd) {
 		r := bufio.NewReader(in)
 		line, err := r.ReadString('\n')
 		if err != nil && !errors.Is(err, io.EOF) {
-			return "", err
+			return "", fmt.Errorf("read input: %w", err)
 		}
 		return strings.TrimRight(line, "\r\n"), nil
 	}
@@ -196,7 +196,7 @@ func readMasked(out io.Writer, in *os.File) (string, error) {
 			if errors.Is(err, io.EOF) && len(buf) > 0 {
 				return string(buf), nil
 			}
-			return "", err
+			return "", fmt.Errorf("read input: %w", err)
 		}
 		switch b[0] {
 		case '\r', '\n':
@@ -211,12 +211,12 @@ func readMasked(out io.Writer, in *os.File) (string, error) {
 		case 127, '\b': // DEL / Backspace
 			if len(buf) > 0 {
 				buf = buf[:len(buf)-1]
-				fmt.Fprint(out, "\b \b")
+				_, _ = fmt.Fprint(out, "\b \b")
 			}
 		default:
 			if b[0] >= 32 {
 				buf = append(buf, b[0])
-				fmt.Fprint(out, "*")
+				_, _ = fmt.Fprint(out, "*")
 			}
 		}
 	}

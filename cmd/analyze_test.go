@@ -350,8 +350,8 @@ func pipeReader(t *testing.T, content string) *os.File {
 	if _, err := io.WriteString(w, content); err != nil {
 		t.Fatalf("write to pipe: %v", err)
 	}
-	w.Close()
-	t.Cleanup(func() { r.Close() })
+	_ = w.Close()
+	t.Cleanup(func() { _ = r.Close() })
 	return r
 }
 
