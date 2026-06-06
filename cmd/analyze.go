@@ -26,7 +26,10 @@ var analyzeCmd = &cobra.Command{
 }
 
 func loadOrPromptKey() (string, error) {
-	ks := keystore.New()
+	ks, err := keystore.New()
+	if err != nil {
+		return "", err
+	}
 
 	key, err := ks.Load()
 	if err == nil {

@@ -3,6 +3,7 @@ package keystore
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -25,9 +26,12 @@ type Store struct {
 }
 
 // New returns a Store using the default path ~/.config/filler-cli/credentials.json.
-func New() *Store {
-	home, _ := os.UserHomeDir()
-	return &Store{path: filepath.Join(home, ".config", "filler-cli", "credentials.json")}
+func New() (*Store, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("keystore: resolve home directory: %w", err)
+	}
+	return &Store{path: filepath.Join(home, ".config", "filler-cli", "credentials.json")}, nil
 }
 
 // NewWithPath returns a Store using the given path. Intended for testing.
