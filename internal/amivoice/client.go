@@ -60,6 +60,13 @@ type Client struct {
 	httpClient *http.Client
 }
 
+func maskKey(key string) string {
+	if len(key) <= 4 {
+		return "****"
+	}
+	return key[:4] + "****"
+}
+
 func New(apiKey string) *Client {
 	return &Client{
 		apiKey:   apiKey,

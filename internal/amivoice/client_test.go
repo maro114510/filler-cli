@@ -323,3 +323,33 @@ func TestSend_TimeoutReturnsError(t *testing.T) {
 		t.Errorf("error should mention timeout, got: %q", msg)
 	}
 }
+
+// --- maskKey ---
+
+func TestMaskKey_LongKey(t *testing.T) {
+	got := maskKey("abcdefgh")
+	if got != "abcd****" {
+		t.Errorf("got %q, want %q", got, "abcd****")
+	}
+}
+
+func TestMaskKey_ExactlyFourBytes(t *testing.T) {
+	got := maskKey("abcd")
+	if got != "****" {
+		t.Errorf("got %q, want %q", got, "****")
+	}
+}
+
+func TestMaskKey_ShortKey(t *testing.T) {
+	got := maskKey("ab")
+	if got != "****" {
+		t.Errorf("got %q, want %q", got, "****")
+	}
+}
+
+func TestMaskKey_EmptyKey(t *testing.T) {
+	got := maskKey("")
+	if got != "****" {
+		t.Errorf("got %q, want %q", got, "****")
+	}
+}
