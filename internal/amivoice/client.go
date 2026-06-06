@@ -10,9 +10,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 const defaultEndpoint = "https://acp-api.amivoice.com/v1/recognize"
+const defaultTimeout = 60 * time.Second
 
 var supportedExtensions = map[string]bool{
 	".wav": true,
@@ -60,9 +62,11 @@ type Client struct {
 
 func New(apiKey string) *Client {
 	return &Client{
-		apiKey:     apiKey,
-		endpoint:   defaultEndpoint,
-		httpClient: http.DefaultClient,
+		apiKey:   apiKey,
+		endpoint: defaultEndpoint,
+		httpClient: &http.Client{
+			Timeout: defaultTimeout,
+		},
 	}
 }
 
