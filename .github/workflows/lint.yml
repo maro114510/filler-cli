@@ -16,5 +16,6 @@ jobs:
       - uses: golangci/golangci-lint-action@v9.2.1
         with: { version: v2.11.4 }
       - uses: aquaproj/aqua-installer@v4.0.4
+        with: { aqua_version: v2.59.1 }
       - name: govulncheck
         run: govulncheck ./...
