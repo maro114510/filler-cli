@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["start_sec", "end_sec", "label"],
+    "properties": {
+      "start_sec": { "type": "number" },
+      "end_sec": { "type": "number" },
+      "label": { "type": "string" },
+      "note": { "type": "string" }
+    },
+    "additionalProperties": false
+  }
+}
