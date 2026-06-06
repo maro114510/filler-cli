@@ -16,36 +16,34 @@ go install github.com/maro114510/filler-cli@latest
 
 Pre-built binaries for Linux, macOS (Intel/Apple Silicon), and Windows are available on the [Releases page](https://github.com/maro114510/filler-cli/releases).
 
-Download and extract the archive for your platform, then place `filler-cli` somewhere in your `$PATH`.
+## API Keys
 
-## Prerequisites
+### AmiVoice API key
 
-An AmiVoice API key from the [AmiVoice Cloud Console](https://acp.amivoice.com/main/register/).
+Required by `analyze` and `coach`. Obtain from the [AmiVoice Cloud Console](https://acp.amivoice.com/main/register/).
 
-> **Note:** Use a standard (non-End-to-End) engine. End-to-End engines suppress filler tokens and will not work with this tool.
+> **Note:** Use a standard (non-End-to-End) engine. End-to-End engines suppress filler tokens and produce zero filler events.
 
-## API Key Setup
+The CLI resolves your key in this order:
 
-The CLI checks for your API key in this order:
+1. **`AMIVOICE_API_KEY`** environment variable
+2. **`AMIVOICE_SERVICE_ID` + `AMIVOICE_SERVICE_PASSWORD`** — issues a one-time key valid for 2 hours (useful for CI)
+3. **Interactive prompt** — prompted once, cached in `~/.config/filler-cli/credentials.json` for 2 hours
 
-1. **Environment variable** — set `AMIVOICE_API_KEY` (recommended for CI and scripts):
+### LLM API key (`coach` only)
 
-   ```bash
-   export AMIVOICE_API_KEY=your_key_here
-   filler-cli analyze speech.wav
-   ```
+Set `LLM_API_KEY` to an [Anthropic API key](https://console.anthropic.com/).
 
-   Copy `.env.example` to `.env`, fill in your key, and load it with `source .env` or [direnv](https://direnv.net/).
-
-2. **Interactive prompt + keystore** — if the env var is not set, the CLI prompts once and caches the key in `~/.config/filler-cli/credentials.json` for 2 hours.
+```bash
+export LLM_API_KEY=sk-ant-...
+```
 
 ## Quickstart
 
 ```bash
+export AMIVOICE_API_KEY=your_key_here
 filler-cli analyze speech.wav
 ```
-
-Expected output:
 
 ```
 # Filler Analysis: speech.wav
@@ -75,7 +73,6 @@ Expected output:
 |--------|-----------|---------|------------|
 | えーと | 3120 | 3890 | 0.95 |
 | あのー | 8440 | 9200 | 0.91 |
-...
 ```
 
 ## Commands
@@ -98,7 +95,7 @@ Transcribes the audio file with AmiVoice and reports filler words found.
 | `--output` | *(stdout)* | Write output to a file instead of stdout |
 | `--keep-filler-token` | `1` | Pass `keepFillerToken` to AmiVoice (`0` or `1`). Set to `1` to detect fillers. |
 
-**JSON output example:**
+**JSON output:**
 
 ```bash
 filler-cli analyze --format json speech.wav
@@ -120,10 +117,31 @@ filler-cli analyze --format json speech.wav
 }
 ```
 
-**Save to file:**
+### coach
+
+```
+filler-cli coach [flags] [audio-file]
+```
+
+Runs the filler analysis pipeline then calls an LLM (Anthropic) to generate improvement comments, pattern analysis, and a speech quality score. Requires `LLM_API_KEY`.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--from-json` | *(none)* | Skip AmiVoice and use a pre-computed `analyze --format json` result |
+| `--format` | `markdown` | Output format: `json` or `markdown` |
+| `--output` | *(stdout)* | Write output to a file instead of stdout |
+
+**Examples:**
 
 ```bash
-filler-cli analyze --format json --output report.json speech.wav
+# Analyze and coach in one step
+filler-cli coach speech.wav
+
+# Reuse a saved JSON result (skips AmiVoice call)
+filler-cli analyze --format json --output result.json speech.wav
+filler-cli coach --from-json result.json
 ```
 
 ### version
@@ -140,71 +158,29 @@ Print the installed version.
 |------|---------|-------------|
 | `--debug` | `false` | Enable debug output |
 
-## Raw curl Example
+## Architecture
 
-The following reproduces what `filler-cli analyze` sends to AmiVoice, without the CLI:
+### analyze
 
-```bash
-curl -s -X POST https://acp-api.amivoice.com/v1/recognize \
-  -F "u=YOUR_API_KEY" \
-  -F "d=grammarFileNames=-a-general keepFillerToken=1" \
-  -F "a=@speech.wav;type=audio/wav"
+```mermaid
+flowchart LR
+    A[audio file] --> B[AmiVoice API]
+    B --> C[filler extraction\n%token% filter]
+    C --> D[Metrics]
+    D --> E[markdown / JSON]
 ```
 
-| Form field | Value | Description |
-|------------|-------|-------------|
-| `u` | API key | Authentication |
-| `d` | `grammarFileNames=-a-general keepFillerToken=1` | Engine and filler-token options |
-| `a` | Audio file (`@filename`) | Must be the last field |
+### coach
 
-## Sample Audio
-
-See [`samples/README.md`](samples/README.md) for recording specifications and the three benchmark scenarios used to validate filler detection.
-
-## Manual Annotations
-
-The `annotations/` directory holds ground-truth filler timestamps in JSON format. See [`annotations/schema.json`](annotations/schema.json) for the schema definition.
-
-## Reproducing Results
-
-After placing audio files in `samples/` (see [`samples/README.md`](samples/README.md)), run:
-
-```bash
-make results
+```mermaid
+flowchart LR
+    A[audio file] --> B[AmiVoice API]
+    F[--from-json] --> D
+    B --> C[filler extraction]
+    C --> D[Metrics]
+    D --> G[Anthropic API]
+    G --> E[markdown / JSON]
 ```
-
-This produces six JSON files under `results/`:
-
-| File | keepFillerToken |
-|------|----------------|
-| `results/sample-a-filler0.result.json` | 0 |
-| `results/sample-a-filler1.result.json` | 1 |
-| `results/sample-b-filler0.result.json` | 0 |
-| `results/sample-b-filler1.result.json` | 1 |
-| `results/sample-c-filler0.result.json` | 0 |
-| `results/sample-c-filler1.result.json` | 1 |
-
-## Limitations
-
-The following limitations were identified during live verification (see [Epic Issue #1](https://github.com/maro114510/filler-cli/issues/1) Kill Criteria).
-
-### KC-001 — Filler token availability
-
-`keepFillerToken=1` requires the `-a-general` (Hybrid) engine.
-End-to-End engines suppress `%...%` tokens and will produce zero filler events.
-If `fillerEvents` is empty on `sample_b` despite audible fillers, verify that the engine is set to `-a-general`.
-
-### KC-002 — Timestamp stability
-
-Token-level `startTime`/`endTime` fields are provided on a best-effort basis by the AmiVoice API.
-In rare cases these values may be zero or absent for short filler tokens.
-When this occurs, `firstFillerTimeMs` and the timeline table will be incomplete.
-
-### KC-003 — Manual vs. API count discrepancy
-
-The API counts only tokens whose `written` field matches `%...%` (e.g., `%えー%`, `%あのー%`).
-Demonstratives (`その`), affirmatives (`はい`), and contextual fillers (`まあ`) are **not** counted.
-A gap between the manual annotation count and the API count is expected for spontaneous speech and reflects this definition boundary, not a detection error.
 
 ## License
 
