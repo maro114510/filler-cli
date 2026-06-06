@@ -1,0 +1,29 @@
+name: test
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with: { go-version-file: go.mod }
+      - name: go test
+        run: |
+          go test -race -count=1 \
+            -coverprofile=coverage.out \
+            -covermode=atomic \
+            ./...
+      - name: coverage threshold
+        run: |
+          go tool cover -func=coverage.out | tee coverage.txt
+          COVERAGE=$(grep '^total' coverage.txt | awk '{print $3}' | tr -d '%')
+          echo "### Coverage: ${COVERAGE}%" >> "$GITHUB_STEP_SUMMARY"
+          if awk "BEGIN {exit !($COVERAGE < 70)}"; then
+            echo "Coverage ${COVERAGE}% is below the 70% threshold" >&2
+            exit 1
+          fi
+      - name: upload coverage artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coverage
+          path: coverage.out
