@@ -298,9 +298,7 @@ func TestNew_ClientHasNonZeroTimeout(t *testing.T) {
 func TestSend_TimeoutReturnsError(t *testing.T) {
 	// Use a very short timeout so the test completes quickly.
 	shortTimeout := 50 * time.Millisecond
-	var called bool
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		called = true
 		time.Sleep(shortTimeout * 10) // sleep far beyond the client timeout
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -318,7 +316,6 @@ func TestSend_TimeoutReturnsError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected timeout error, got nil")
 	}
-	_ = called // server may or may not have been reached before timeout
 	msg := err.Error()
 	if !strings.Contains(msg, "timeout") && !strings.Contains(msg, "context deadline exceeded") {
 		t.Errorf("error should mention timeout, got: %q", msg)
