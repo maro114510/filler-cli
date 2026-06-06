@@ -1,0 +1,21 @@
+name: lint
+on: [push, pull_request]
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: go.mod }
+      - name: go mod verify
+        run: go mod verify
+      - name: go mod tidy check
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
+      - uses: golangci/golangci-lint-action@v9.2.1
+        with: { version: v2.11.4 }
+      - uses: aquaproj/aqua-installer@v4.0.4
+        with: { aqua_version: v2.59.1 }
+      - name: govulncheck
+        run: govulncheck ./...

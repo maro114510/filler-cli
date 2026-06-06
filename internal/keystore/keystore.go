@@ -52,12 +52,12 @@ func (s *Store) Load() (string, error) {
 		return "", ErrNotFound
 	}
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("keystore: read credentials: %w", err)
 	}
 
 	var cred credentials
 	if err := json.Unmarshal(data, &cred); err != nil {
-		return "", err
+		return "", fmt.Errorf("keystore: unmarshal credentials: %w", err)
 	}
 
 	if time.Since(cred.SavedAt) >= ttl {
@@ -75,16 +75,19 @@ func (s *Store) Save(key string) error {
 // SaveWithTime writes the key with the given timestamp. Exposed for testing TTL boundaries.
 func (s *Store) SaveWithTime(key string, savedAt time.Time) error {
 	if err := os.MkdirAll(filepath.Dir(s.path), 0700); err != nil {
-		return err
+		return fmt.Errorf("keystore: create directory: %w", err)
 	}
 
 	cred := credentials{AmiVoiceKey: key, SavedAt: savedAt}
 	data, err := json.Marshal(cred)
 	if err != nil {
-		return err
+		return fmt.Errorf("keystore: marshal credentials: %w", err)
 	}
 
-	return os.WriteFile(s.path, data, 0600)
+	if err := os.WriteFile(s.path, data, 0600); err != nil {
+		return fmt.Errorf("keystore: write credentials: %w", err)
+	}
+	return nil
 }
 
 // Delete removes the credentials file. It is a no-op if the file does not exist.
@@ -93,5 +96,8 @@ func (s *Store) Delete() error {
 	if os.IsNotExist(err) {
 		return nil
 	}
-	return err
+	if err != nil {
+		return fmt.Errorf("keystore: remove credentials: %w", err)
+	}
+	return nil
 }

@@ -36,7 +36,9 @@ func writeTempAudio(t *testing.T, ext string) string {
 		t.Fatalf("CreateTemp: %v", err)
 	}
 	_, _ = f.WriteString("dummy audio data")
-	f.Close()
+	if err := f.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
 	return f.Name()
 }
 
@@ -258,7 +260,9 @@ func TestSend_MultipartStructure(t *testing.T) {
 				n, _ := part.Read(buf)
 				apiKeyField = string(buf[:n])
 			}
-			part.Close()
+			if err := part.Close(); err != nil {
+				break
+			}
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(validResponseJSON))
