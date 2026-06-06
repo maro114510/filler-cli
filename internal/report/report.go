@@ -87,7 +87,11 @@ func BuildJSON(audioPath string, durationSec float64, m *filler.Metrics, generat
 		FillerEvents:      events,
 		AverageConfidence: m.AverageConfidence,
 	}
-	return json.MarshalIndent(r, "", "  ")
+	data, err := json.MarshalIndent(r, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("report: marshal JSON: %w", err)
+	}
+	return data, nil
 }
 
 // BuildMarkdown produces a human-readable 8-section Markdown report.

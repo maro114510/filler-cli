@@ -92,7 +92,7 @@ func writeOutput(output string) error {
 		fmt.Print(output)
 		return nil
 	}
-	if err := os.WriteFile(analyzeOutput, []byte(output), 0644); err != nil {
+	if err := os.WriteFile(analyzeOutput, []byte(output), 0600); err != nil {
 		return fmt.Errorf("failed to write output to %s: %w", analyzeOutput, err)
 	}
 	return nil
@@ -101,7 +101,7 @@ func writeOutput(output string) error {
 func loadOrPromptKey() (string, error) {
 	ks, err := keystore.New()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("load keystore: %w", err)
 	}
 
 	key, err := ks.Load()
@@ -114,7 +114,7 @@ func loadOrPromptKey() (string, error) {
 			return "", fmt.Errorf("failed to delete expired credentials: %w", delErr)
 		}
 	} else if !errors.Is(err, keystore.ErrNotFound) {
-		return "", err
+		return "", fmt.Errorf("load credentials: %w", err)
 	}
 
 	key, err = promptKey()

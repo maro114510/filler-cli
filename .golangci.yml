@@ -1,0 +1,33 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - bodyclose    # HTTP response body must be closed
+    - gosec        # security patterns: file permissions, credential exposure
+    - wrapcheck    # errors from external packages must be wrapped
+    - gocritic     # comprehensive style and correctness checks
+    - misspell     # English spelling in identifiers and comments
+    - exhaustive   # switch statements must cover all enum values
+    - tparallel    # detect inappropriate usage of t.Parallel()
+  settings:
+    gosec:
+      excludes:
+        - G304  # file open from user-supplied path is intentional (audioPath in Send())
+    exhaustive:
+      default-signifies-exhaustive: true
+    errcheck:
+      exclude-functions:
+        - (io.Closer).Close   # defer resp.Body.Close() — error unhandleable at call site
+        - (*os.File).Close    # defer f.Close() — error unhandleable at call site
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-rules:
+    - path: "_test.go"
+      linters: [wrapcheck]  # test helpers are exempt from error-wrapping rules
+
+run:
+  timeout: 5m
+  tests: true

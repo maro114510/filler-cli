@@ -1,6 +1,8 @@
 package pipeline
 
 import (
+	"fmt"
+
 	"github.com/maro114510/filler-cli/internal/amivoice"
 	"github.com/maro114510/filler-cli/internal/filler"
 )
@@ -32,7 +34,7 @@ func Run(sender Sender, audioPath string, opts Options) (*Result, error) {
 		KeepFillerToken:  opts.KeepFillerToken,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("pipeline: send audio: %w", err)
 	}
 
 	durationSec := maxEndTime(resp)
