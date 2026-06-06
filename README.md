@@ -165,6 +165,47 @@ See [`samples/README.md`](samples/README.md) for recording specifications and th
 
 The `annotations/` directory holds ground-truth filler timestamps in JSON format. See [`annotations/schema.json`](annotations/schema.json) for the schema definition.
 
+## Reproducing Results
+
+After placing audio files in `samples/` (see [`samples/README.md`](samples/README.md)), run:
+
+```bash
+make results
+```
+
+This produces six JSON files under `results/`:
+
+| File | keepFillerToken |
+|------|----------------|
+| `results/sample-a-filler0.result.json` | 0 |
+| `results/sample-a-filler1.result.json` | 1 |
+| `results/sample-b-filler0.result.json` | 0 |
+| `results/sample-b-filler1.result.json` | 1 |
+| `results/sample-c-filler0.result.json` | 0 |
+| `results/sample-c-filler1.result.json` | 1 |
+
+## Limitations
+
+The following limitations were identified during live verification (see [Epic Issue #1](https://github.com/maro114510/filler-cli/issues/1) Kill Criteria).
+
+### KC-001 — Filler token availability
+
+`keepFillerToken=1` requires the `-a-general` (Hybrid) engine.
+End-to-End engines suppress `%...%` tokens and will produce zero filler events.
+If `fillerEvents` is empty on `sample_b` despite audible fillers, verify that the engine is set to `-a-general`.
+
+### KC-002 — Timestamp stability
+
+Token-level `startTime`/`endTime` fields are provided on a best-effort basis by the AmiVoice API.
+In rare cases these values may be zero or absent for short filler tokens.
+When this occurs, `firstFillerTimeMs` and the timeline table will be incomplete.
+
+### KC-003 — Manual vs. API count discrepancy
+
+The API counts only tokens whose `written` field matches `%...%` (e.g., `%えー%`, `%あのー%`).
+Demonstratives (`その`), affirmatives (`はい`), and contextual fillers (`まあ`) are **not** counted.
+A gap between the manual annotation count and the API count is expected for spontaneous speech and reflects this definition boundary, not a detection error.
+
 ## License
 
 Apache-2.0 — see [LICENSE](LICENSE) for details.
