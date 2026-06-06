@@ -16,8 +16,8 @@ func TestName(t *testing.T) {
 }
 
 func TestVersion(t *testing.T) {
-	if !semver.MatchString(cmdinfo.Version) {
-		t.Errorf("Version = %q, want semver vX.Y.Z", cmdinfo.Version)
+	if cmdinfo.Version != "(devel)" && !semver.MatchString(cmdinfo.Version) {
+		t.Errorf("Version = %q, want semver vX.Y.Z or (devel)", cmdinfo.Version)
 	}
 }
 
