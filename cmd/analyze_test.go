@@ -46,12 +46,13 @@ func TestValidateAudioFile(t *testing.T) {
 	})
 
 	t.Run("valid wav file returns nil", func(t *testing.T) {
-		f, err := os.CreateTemp("", "test*.wav")
+		f, err := os.CreateTemp(t.TempDir(), "test*.wav")
 		if err != nil {
 			t.Fatal(err)
 		}
-		f.Close()
-		t.Cleanup(func() { os.Remove(f.Name()) })
+		if err := f.Close(); err != nil {
+			t.Fatal(err)
+		}
 
 		if err := validateAudioFile(f.Name()); err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -59,12 +60,13 @@ func TestValidateAudioFile(t *testing.T) {
 	})
 
 	t.Run("valid mp3 file returns nil", func(t *testing.T) {
-		f, err := os.CreateTemp("", "test*.mp3")
+		f, err := os.CreateTemp(t.TempDir(), "test*.mp3")
 		if err != nil {
 			t.Fatal(err)
 		}
-		f.Close()
-		t.Cleanup(func() { os.Remove(f.Name()) })
+		if err := f.Close(); err != nil {
+			t.Fatal(err)
+		}
 
 		if err := validateAudioFile(f.Name()); err != nil {
 			t.Errorf("unexpected error: %v", err)
