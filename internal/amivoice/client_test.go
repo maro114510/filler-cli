@@ -42,6 +42,8 @@ func writeTempAudio(t *testing.T, ext string) string {
 	return f.Name()
 }
 
+// validResponseJSON uses AmiVoice's actual time unit: milliseconds as integers.
+// starttime:100 = 100 ms = 0.1 s; endtime:800 = 800 ms = 0.8 s.
 const validResponseJSON = `{
 	"results": [
 		{
@@ -51,15 +53,15 @@ const validResponseJSON = `{
 					"written": "%えーと%",
 					"spoken":  "えーと",
 					"confidence": 0.95,
-					"starttime": 0.1,
-					"endtime":   0.8
+					"starttime": 100,
+					"endtime":   800
 				},
 				{
 					"written": "今日は",
 					"spoken":  "きょうは",
 					"confidence": 0.99,
-					"starttime": 0.9,
-					"endtime":   1.5
+					"starttime": 900,
+					"endtime":   1500
 				}
 			]
 		}
