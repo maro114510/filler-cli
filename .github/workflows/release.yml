@@ -6,7 +6,41 @@ on:
       - 'v*'
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with: { go-version-file: go.mod }
+      - name: go test
+        run: |
+          go test -race -count=1 \
+            -coverprofile=coverage.out \
+            -covermode=atomic \
+            ./...
+      - name: coverage threshold
+        run: |
+          go tool cover -func=coverage.out | tee coverage.txt
+          COVERAGE=$(grep '^total' coverage.txt | awk '{print $3}' | tr -d '%')
+          echo "### Coverage: ${COVERAGE}%" >> "$GITHUB_STEP_SUMMARY"
+          if awk "BEGIN {exit !($COVERAGE < 70)}"; then
+            echo "Coverage ${COVERAGE}% is below the 70% threshold" >&2
+            exit 1
+          fi
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with: { go-version-file: go.mod }
+      - name: go mod verify
+        run: go mod verify
+      - uses: golangci/golangci-lint-action@82606bf257cbaff209d206a39f5134f0cfbfd2ee # v9.2.1
+        with: { version: v2.11.4 }
+
   release:
+    needs: [test, lint]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -19,7 +53,7 @@ jobs:
           go-version-file: go.mod
       - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6.4.0
         with:
-          version: latest
+          version: "~> v2"
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
