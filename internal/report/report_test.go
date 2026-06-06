@@ -274,3 +274,137 @@ func TestBuildMarkdown_NoFillers_SectionsPresent(t *testing.T) {
 		t.Errorf("section headings mismatch with no fillers (-want +got):\n%s", diff)
 	}
 }
+
+// ParseJSON tests
+
+func TestParseJSON_RoundTrip(t *testing.T) {
+	events := []filler.FillerEvent{
+		{DisplayName: "えーと", StartMs: 1500, EndMs: 2000, Confidence: 0.9},
+		{DisplayName: "あー", StartMs: 3000, EndMs: 3500, Confidence: 0.8},
+	}
+	m := makeMetrics(events, map[string]int{"えーと": 1, "あー": 1})
+	const audioPath = "/path/to/test.wav"
+	const durationSec = 60.0
+
+	data, err := report.BuildJSON(audioPath, durationSec, m, fixedTime)
+	if err != nil {
+		t.Fatalf("BuildJSON: %v", err)
+	}
+
+	parsed, err := report.ParseJSON(data)
+	if err != nil {
+		t.Fatalf("ParseJSON: %v", err)
+	}
+
+	if parsed.AudioFile != "test.wav" {
+		t.Errorf("AudioFile = %q, want %q", parsed.AudioFile, "test.wav")
+	}
+	if parsed.DurationSec != durationSec {
+		t.Errorf("DurationSec = %v, want %v", parsed.DurationSec, durationSec)
+	}
+	if parsed.Metrics.TotalFillers != m.TotalFillers {
+		t.Errorf("TotalFillers = %d, want %d", parsed.Metrics.TotalFillers, m.TotalFillers)
+	}
+	if diff := cmp.Diff(m.Breakdown, parsed.Metrics.Breakdown); diff != "" {
+		t.Errorf("Breakdown mismatch (-want +got):\n%s", diff)
+	}
+	if len(parsed.Metrics.FillerEvents) != len(m.FillerEvents) {
+		t.Errorf("FillerEvents len = %d, want %d", len(parsed.Metrics.FillerEvents), len(m.FillerEvents))
+	}
+}
+
+func TestParseJSON_EmptyFillerEvents(t *testing.T) {
+	m := &filler.Metrics{
+		TotalFillers:      0,
+		FillersPerMinute:  0.0,
+		Breakdown:         map[string]int{},
+		FirstFillerTimeMs: -1,
+		FillerEvents:      []filler.FillerEvent{},
+	}
+	data, err := report.BuildJSON("audio.wav", 30.0, m, fixedTime)
+	if err != nil {
+		t.Fatalf("BuildJSON: %v", err)
+	}
+	parsed, err := report.ParseJSON(data)
+	if err != nil {
+		t.Fatalf("ParseJSON: %v", err)
+	}
+	if parsed.Metrics.TotalFillers != 0 {
+		t.Errorf("TotalFillers = %d, want 0", parsed.Metrics.TotalFillers)
+	}
+}
+
+func TestParseJSON_InvalidJSON(t *testing.T) {
+	_, err := report.ParseJSON([]byte("not-json"))
+	if err == nil {
+		t.Fatal("expected error for invalid JSON, got nil")
+	}
+}
+
+// BuildCoachMarkdown / BuildCoachJSON tests
+
+func TestBuildCoachMarkdown_ContainsAllSections(t *testing.T) {
+	m := makeMetrics(
+		[]filler.FillerEvent{{DisplayName: "えーと", StartMs: 1000, EndMs: 1500, Confidence: 0.9}},
+		map[string]int{"えーと": 1},
+	)
+	coach := &report.CoachData{
+		ImprovementComments: "発話の冒頭でのフィラー使用を減らしましょう。",
+		PatternAnalysis:     "フィラーはスピーチの最初の30%に集中しています。",
+		QualityScore:        72,
+		ScoreDelta:          nil,
+	}
+	md := report.BuildCoachMarkdown("sample.wav", 60.0, m, coach)
+
+	wantSections := []string{
+		report.SectionImprovementComments,
+		report.SectionPatternAnalysis,
+		report.SectionQualityScore,
+	}
+	for _, sec := range wantSections {
+		if !strings.Contains(md, sec) {
+			t.Errorf("coach markdown missing section: %q", sec)
+		}
+	}
+	if !strings.Contains(md, "72") {
+		t.Errorf("coach markdown should contain quality score 72")
+	}
+}
+
+func TestBuildCoachJSON_ContainsCoachResult(t *testing.T) {
+	m := makeMetrics(nil, map[string]int{})
+	coach := &report.CoachData{
+		ImprovementComments: "Good job.",
+		PatternAnalysis:     "No pattern detected.",
+		QualityScore:        85,
+		ScoreDelta:          nil,
+	}
+	data, err := report.BuildCoachJSON("sample.wav", 60.0, m, fixedTime, coach)
+	if err != nil {
+		t.Fatalf("BuildCoachJSON: %v", err)
+	}
+
+	var out map[string]any
+	if err := json.Unmarshal(data, &out); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+
+	// Metrics fields must be present at top level (AC-3 compatibility).
+	for _, field := range []string{"totalFillers", "fillersPerMinute", "breakdown"} {
+		if _, ok := out[field]; !ok {
+			t.Errorf("missing top-level field: %q", field)
+		}
+	}
+
+	// Coach result must be nested under coachResult.
+	cr, ok := out["coachResult"].(map[string]any)
+	if !ok {
+		t.Fatal("coachResult field missing or wrong type")
+	}
+	if cr["improvementComments"] != "Good job." {
+		t.Errorf("improvementComments = %v, want %q", cr["improvementComments"], "Good job.")
+	}
+	if cr["qualityScore"] != float64(85) {
+		t.Errorf("qualityScore = %v, want 85", cr["qualityScore"])
+	}
+}
