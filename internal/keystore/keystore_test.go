@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,6 +14,32 @@ import (
 func newStore(t *testing.T) *keystore.Store {
 	t.Helper()
 	return keystore.NewWithPath(filepath.Join(t.TempDir(), "credentials.json"))
+}
+
+// New
+
+func TestNew_Success(t *testing.T) {
+	ks, err := keystore.New()
+	if err != nil {
+		t.Fatalf("New() returned unexpected error: %v", err)
+	}
+	if !strings.Contains(ks.Path(), "filler-cli") {
+		t.Errorf("path %q should contain %q", ks.Path(), "filler-cli")
+	}
+}
+
+func TestNew_HomeError(t *testing.T) {
+	t.Setenv("HOME", "")
+	if _, err := os.UserHomeDir(); err == nil {
+		t.Skip("os.UserHomeDir() succeeded without $HOME (passwd fallback available); skipping")
+	}
+	_, err := keystore.New()
+	if err == nil {
+		t.Fatal("expected non-nil error, got nil")
+	}
+	if !strings.Contains(err.Error(), "keystore:") {
+		t.Errorf("error %q should contain %q prefix", err.Error(), "keystore:")
+	}
 }
 
 // Load
