@@ -1,4 +1,4 @@
-.PHONY: build test lint clean results
+.PHONY: build test lint clean results release-check release-snapshot tag
 
 build:
 	go build -o filler-cli .
@@ -11,6 +11,19 @@ lint:
 
 clean:
 	rm -f filler-cli
+
+release-check:
+	goreleaser check
+
+release-snapshot:
+	goreleaser release --snapshot --clean
+
+tag:
+	@[ -n "$(VERSION)" ] || (echo "Error: VERSION is required. Usage: make tag VERSION=v1.2.3" && exit 1)
+	@echo "$(VERSION)" | grep -qE "^v[0-9]+\.[0-9]+\.[0-9]" || (echo "Error: VERSION must be semver (e.g., v1.2.3)" && exit 1)
+	@git branch --show-current | grep -q "^main$$" || (echo "Error: must be on main branch to tag" && exit 1)
+	git tag -a $(VERSION) -m "Release $(VERSION)"
+	git push origin $(VERSION)
 
 results: build
 	@mkdir -p results
