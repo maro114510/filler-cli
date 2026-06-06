@@ -9,6 +9,10 @@
 # *.mp4
 # *.json
 
+### Sample audio files (not committed — see samples/README.md) ###
+samples/*.wav
+samples/*.mp3
+
 
 ### macOS ###
 # General
