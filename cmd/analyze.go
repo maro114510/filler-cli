@@ -99,6 +99,10 @@ func writeOutput(output string) error {
 }
 
 func loadOrPromptKey() (string, error) {
+	if key := os.Getenv("AMIVOICE_API_KEY"); key != "" {
+		return key, nil
+	}
+
 	ks, err := keystore.New()
 	if err != nil {
 		return "", err
