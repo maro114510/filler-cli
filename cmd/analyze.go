@@ -98,14 +98,19 @@ func writeOutput(output string) error {
 	return nil
 }
 
-func loadOrPromptKey() (string, error) {
-	if key := os.Getenv("AMIVOICE_API_KEY"); key != "" {
-		return key, nil
-	}
+type oneTimeKeyIssuer func(serviceID, servicePassword string, opts amivoice.OneTimeKeyOptions) (string, error)
 
+func loadOrPromptKey() (string, error) {
 	ks, err := keystore.New()
 	if err != nil {
 		return "", fmt.Errorf("load keystore: %w", err)
+	}
+	return loadOrPromptKeyInternal(ks, amivoice.IssueOneTimeKey)
+}
+
+func loadOrPromptKeyInternal(ks *keystore.Store, issuer oneTimeKeyIssuer) (string, error) {
+	if key := os.Getenv("AMIVOICE_API_KEY"); key != "" {
+		return key, nil
 	}
 
 	key, err := ks.Load()
@@ -119,6 +124,25 @@ func loadOrPromptKey() (string, error) {
 		}
 	} else if !errors.Is(err, keystore.ErrNotFound) {
 		return "", fmt.Errorf("load credentials: %w", err)
+	}
+
+	sid := os.Getenv("AMIVOICE_SERVICE_ID")
+	spw := os.Getenv("AMIVOICE_SERVICE_PASSWORD")
+	if sid != "" || spw != "" {
+		if sid == "" {
+			return "", errors.New("AMIVOICE_SERVICE_PASSWORD is set but AMIVOICE_SERVICE_ID is missing")
+		}
+		if spw == "" {
+			return "", errors.New("AMIVOICE_SERVICE_ID is set but AMIVOICE_SERVICE_PASSWORD is missing")
+		}
+		key, err = issuer(sid, spw, amivoice.OneTimeKeyOptions{ValidFor: 2 * time.Hour})
+		if err != nil {
+			return "", fmt.Errorf("issue one-time key: %w", err)
+		}
+		if err := ks.Save(key); err != nil {
+			return "", fmt.Errorf("failed to save credentials: %w", err)
+		}
+		return key, nil
 	}
 
 	key, err = promptKey()
