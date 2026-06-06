@@ -19,4 +19,8 @@ samples/*.mp3
 .DS_Store
 
 
+### Test coverage output ###
+coverage.out
+coverage.txt
+
 # End Of Ignore
