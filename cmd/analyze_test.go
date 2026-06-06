@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -332,5 +334,67 @@ func TestLoadOrPromptKeyInternal_IssuerError_Propagated(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "401") {
 		t.Errorf("error should contain issuer error, got: %q", err.Error())
+	}
+}
+
+// --- readMasked (non-TTY path) ---
+
+// pipeReader returns the read end of an os.Pipe pre-filled with content.
+// The write end is closed so the reader sees EOF after the content.
+func pipeReader(t *testing.T, content string) *os.File {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	if _, err := io.WriteString(w, content); err != nil {
+		t.Fatalf("write to pipe: %v", err)
+	}
+	w.Close()
+	t.Cleanup(func() { r.Close() })
+	return r
+}
+
+func TestReadMasked_NonTTY_ReturnsKeyWithoutNewline(t *testing.T) {
+	r := pipeReader(t, "myapikey\n")
+	got, err := readMasked(&bytes.Buffer{}, r)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "myapikey" {
+		t.Errorf("got %q, want %q", got, "myapikey")
+	}
+}
+
+func TestReadMasked_NonTTY_StripsCRLF(t *testing.T) {
+	r := pipeReader(t, "myapikey\r\n")
+	got, err := readMasked(&bytes.Buffer{}, r)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "myapikey" {
+		t.Errorf("got %q, want %q", got, "myapikey")
+	}
+}
+
+func TestReadMasked_NonTTY_EmptyInput(t *testing.T) {
+	r := pipeReader(t, "\n")
+	got, err := readMasked(&bytes.Buffer{}, r)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "" {
+		t.Errorf("got %q, want empty string", got)
+	}
+}
+
+func TestReadMasked_NonTTY_NoTrailingNewline(t *testing.T) {
+	r := pipeReader(t, "myapikey")
+	got, err := readMasked(&bytes.Buffer{}, r)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "myapikey" {
+		t.Errorf("got %q, want %q", got, "myapikey")
 	}
 }
