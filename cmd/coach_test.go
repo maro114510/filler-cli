@@ -226,3 +226,21 @@ func TestWriteCoachOutput_EmptyPath_Stdout(t *testing.T) {
 		t.Errorf("stdout should contain 'hello', got: %q", buf.String())
 	}
 }
+
+func TestWriteCoachOutput_FilePath(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "out.md")
+	coachOutput = path
+	t.Cleanup(func() { coachOutput = "" })
+
+	if err := writeCoachOutput("coach output content"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read output file: %v", err)
+	}
+	if string(got) != "coach output content" {
+		t.Errorf("file content = %q, want %q", got, "coach output content")
+	}
+}

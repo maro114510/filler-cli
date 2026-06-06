@@ -141,3 +141,10 @@ func TestAnthropicCommenter_Coach_InvalidJSON(t *testing.T) {
 		t.Fatal("expected error for invalid JSON response, got nil")
 	}
 }
+
+func TestNewAnthropicCommenter(t *testing.T) {
+	c := llm.NewAnthropicCommenter("my-api-key")
+	if c == nil {
+		t.Fatal("NewAnthropicCommenter returned nil")
+	}
+}
