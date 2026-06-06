@@ -398,3 +398,20 @@ func TestReadMasked_NonTTY_NoTrailingNewline(t *testing.T) {
 		t.Errorf("got %q, want %q", got, "myapikey")
 	}
 }
+
+func TestReadMasked_NonTTY_ReadError(t *testing.T) {
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("close write end: %v", err)
+	}
+	if err := r.Close(); err != nil {
+		t.Fatalf("close read end: %v", err)
+	}
+	_, err = readMasked(&bytes.Buffer{}, r)
+	if err == nil {
+		t.Fatal("expected error reading from closed file, got nil")
+	}
+}

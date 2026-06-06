@@ -172,3 +172,110 @@ func TestDelete_Idempotent(t *testing.T) {
 		t.Errorf("Delete on missing file: %v", err)
 	}
 }
+
+// SaveLLM / LoadLLM
+
+func TestSaveLLM_PreservesAmiVoiceKey(t *testing.T) {
+	s := newStore(t)
+	if err := s.Save("ami-key"); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	if err := s.SaveLLM("llm-key", "anthropic"); err != nil {
+		t.Fatalf("SaveLLM: %v", err)
+	}
+	got, err := s.Load()
+	if err != nil {
+		t.Fatalf("Load after SaveLLM: %v", err)
+	}
+	if got != "ami-key" {
+		t.Errorf("AmiVoice key = %q, want %q", got, "ami-key")
+	}
+}
+
+func TestSave_PreservesLLMKey(t *testing.T) {
+	s := newStore(t)
+	if err := s.SaveLLM("llm-key", "anthropic"); err != nil {
+		t.Fatalf("SaveLLM: %v", err)
+	}
+	if err := s.Save("ami-key"); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	gotKey, gotProvider, err := s.LoadLLM()
+	if err != nil {
+		t.Fatalf("LoadLLM after Save: %v", err)
+	}
+	if gotKey != "llm-key" {
+		t.Errorf("LLM key = %q, want %q", gotKey, "llm-key")
+	}
+	if gotProvider != "anthropic" {
+		t.Errorf("LLM provider = %q, want %q", gotProvider, "anthropic")
+	}
+}
+
+func TestLoadLLM_Success(t *testing.T) {
+	s := newStore(t)
+	if err := s.SaveLLM("my-llm-key", "anthropic"); err != nil {
+		t.Fatalf("SaveLLM: %v", err)
+	}
+	key, provider, err := s.LoadLLM()
+	if err != nil {
+		t.Fatalf("LoadLLM: %v", err)
+	}
+	if key != "my-llm-key" {
+		t.Errorf("key = %q, want %q", key, "my-llm-key")
+	}
+	if provider != "anthropic" {
+		t.Errorf("provider = %q, want %q", provider, "anthropic")
+	}
+}
+
+func TestLoadLLM_NotFound_FileAbsent(t *testing.T) {
+	s := newStore(t)
+	_, _, err := s.LoadLLM()
+	if !errors.Is(err, keystore.ErrNotFound) {
+		t.Errorf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestLoadLLM_NotFound_LegacyFileNoLLMFields(t *testing.T) {
+	s := newStore(t)
+	// write a legacy file that has no llm_key field
+	if err := s.Save("ami-only-key"); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	_, _, err := s.LoadLLM()
+	if !errors.Is(err, keystore.ErrNotFound) {
+		t.Errorf("expected ErrNotFound for legacy file, got %v", err)
+	}
+}
+
+func TestLoadLLM_Expired(t *testing.T) {
+	s := newStore(t)
+	if err := s.SaveLLMWithTime("llm-key", "anthropic", time.Now().Add(-2*time.Hour-1*time.Second)); err != nil {
+		t.Fatalf("SaveLLMWithTime: %v", err)
+	}
+	_, _, err := s.LoadLLM()
+	if !errors.Is(err, keystore.ErrExpired) {
+		t.Errorf("expected ErrExpired, got %v", err)
+	}
+}
+
+func TestSaveLLM_ResetsSharedTTL(t *testing.T) {
+	s := newStore(t)
+	// Save AmiVoice key near expiry
+	if err := s.SaveWithTime("ami-key", time.Now().Add(-1*time.Hour-50*time.Minute)); err != nil {
+		t.Fatalf("SaveWithTime: %v", err)
+	}
+	// Saving LLM key resets the shared TTL to now
+	if err := s.SaveLLM("llm-key", "anthropic"); err != nil {
+		t.Fatalf("SaveLLM: %v", err)
+	}
+	// AmiVoice key should now be valid (TTL was reset)
+	got, err := s.Load()
+	if err != nil {
+		t.Fatalf("Load after TTL reset: %v", err)
+	}
+	if got != "ami-key" {
+		t.Errorf("AmiVoice key = %q, want %q", got, "ami-key")
+	}
+}
