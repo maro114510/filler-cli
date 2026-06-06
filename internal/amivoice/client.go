@@ -169,7 +169,13 @@ func parseResponse(body []byte) (*Response, error) {
 	for i, r := range raw.Results {
 		tokens := make([]Token, len(r.Tokens))
 		for j, t := range r.Tokens {
-			tokens[j] = Token(t)
+			tokens[j] = Token{
+				Written:    t.Written,
+				Spoken:     t.Spoken,
+				Confidence: t.Confidence,
+				StartTime:  t.StartTime / 1000.0, // AmiVoice returns ms → convert to s
+				EndTime:    t.EndTime / 1000.0,
+			}
 		}
 		out.Results[i] = Result{Text: r.Text, Tokens: tokens}
 	}
