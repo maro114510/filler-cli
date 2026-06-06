@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 )
@@ -69,7 +70,7 @@ const validResponseJSON = `{
 // --- AC-2: non-existent file ---
 
 func TestSend_FileNotFound(t *testing.T) {
-	c := &Client{apiKey: "k", endpoint: "http://unused", httpClient: http.DefaultClient}
+	c := &Client{apiKey: "k", endpoint: "http://unused", httpClient: &http.Client{}}
 	_, err := c.Send(filepath.Join(t.TempDir(), "nosuch.wav"), Options{GrammarFileNames: "-a-general", KeepFillerToken: 1})
 	if err == nil {
 		t.Fatal("expected error for non-existent file, got nil")
@@ -276,5 +277,46 @@ func TestSend_MultipartStructure(t *testing.T) {
 	}
 	if last := partNames[len(partNames)-1]; last != "a" {
 		t.Errorf("last multipart part must be 'a', got %q", last)
+	}
+}
+
+// --- AC-2: New() constructs a client with a non-zero Timeout ---
+
+func TestNew_ClientHasNonZeroTimeout(t *testing.T) {
+	c := New("test-key")
+	if c.httpClient.Timeout <= 0 {
+		t.Errorf("New() httpClient.Timeout = %v, want > 0", c.httpClient.Timeout)
+	}
+}
+
+// --- AC-3: Send() returns an error when the server does not respond within the timeout ---
+
+func TestSend_TimeoutReturnsError(t *testing.T) {
+	// Use a very short timeout so the test completes quickly.
+	shortTimeout := 50 * time.Millisecond
+	var called bool
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		time.Sleep(shortTimeout * 10) // sleep far beyond the client timeout
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	c := &Client{
+		apiKey:   "test-key",
+		endpoint: ts.URL,
+		httpClient: &http.Client{
+			Timeout: shortTimeout,
+		},
+	}
+	path := writeTempAudio(t, ".wav")
+	_, err := c.Send(path, Options{GrammarFileNames: "-a-general", KeepFillerToken: 1})
+	if err == nil {
+		t.Fatal("expected timeout error, got nil")
+	}
+	_ = called // server may or may not have been reached before timeout
+	msg := err.Error()
+	if !strings.Contains(msg, "timeout") && !strings.Contains(msg, "context deadline exceeded") {
+		t.Errorf("error should mention timeout, got: %q", msg)
 	}
 }
