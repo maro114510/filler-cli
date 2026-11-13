@@ -1,6 +1,6 @@
 module github.com/maro114510/filler-cli
 
-go 1.26.0
+go 1.26.11
 
 require (
 	github.com/google/go-cmp v0.7.0
